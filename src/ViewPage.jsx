@@ -15,7 +15,7 @@ export default function ViewPage() {
         if (!res.ok) throw new Error('not found')
         return res.json()
       })
-      .then(data => setPlacedFurniture(JSON.parse(data.scene)))
+      .then(data => setPlacedFurniture(data.scene))
       .catch(() => setError(true))
   }, [id])
 

@@ -164,7 +164,7 @@ function DraggableFurniture({ path, position, floorPlane, onDragStart, onDragEnd
   )
 }
 
-function Scene({ placedFurniture, selectedId, setSelectedId, isDragging, setIsDragging, onMeshListUpdate, onUpdatePosition, isEmbed }) {
+export function Scene({ placedFurniture, selectedId, setSelectedId, isDragging, setIsDragging, onMeshListUpdate, onUpdatePosition, isEmbed }) {
   const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
 
   return (
@@ -242,6 +242,43 @@ function Sidebar({ furnitureCatalog, onAddFurniture, onDeleteSelected, selectedI
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     })
+  }
+
+  const [sharing, setSharing] = useState(false)
+  const [shareMsg, setShareMsg] = useState(null)
+
+  const handleShareLink = async () => {
+    setSharing(true)
+    setShareMsg(null)
+    try {
+      const sceneData = placedFurniture.map(item => {
+        const mat = { ...item.material }
+        if (mat.textureUrl?.startsWith('blob:')) mat.textureUrl = null
+        if (mat.meshMaterials) {
+          const mm = {}
+          for (const [k, v] of Object.entries(mat.meshMaterials)) {
+            mm[k] = v.textureUrl?.startsWith('blob:') ? { ...v, textureUrl: null } : { ...v }
+          }
+          mat.meshMaterials = mm
+        }
+        return { ...item, material: mat }
+      })
+      const res = await fetch('/api/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scene: JSON.stringify(sceneData) }),
+      })
+      if (!res.ok) throw new Error('Server error')
+      const { id } = await res.json()
+      const url = `https://room-demo-nu.vercel.app/view/${id}`
+      await navigator.clipboard.writeText(url)
+      setShareMsg('Link copied!')
+    } catch {
+      setShareMsg('Failed — try again')
+    } finally {
+      setSharing(false)
+      setTimeout(() => setShareMsg(null), 3000)
+    }
   }
   
   const selectedItem = placedFurniture.find(item => item.instanceId === selectedId)
@@ -403,21 +440,40 @@ function Sidebar({ furnitureCatalog, onAddFurniture, onDeleteSelected, selectedI
       {/* Embed / iframe generator */}
       <div style={{ marginTop: '40px', borderTop: '1px solid #333', paddingTop: '20px' }}>
         <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>EMBED</div>
-        <button
-          onClick={() => setShowEmbed(!showEmbed)}
-          style={{
-            padding: '10px',
-            background: '#1a3a5c',
-            border: 'none',
-            borderRadius: '6px',
-            color: 'white',
-            cursor: 'pointer',
-            width: '100%',
-            fontSize: '13px',
-          }}
-        >
-          {showEmbed ? 'Hide Embed' : 'Generate iframe'}
-        </button>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button
+            onClick={() => setShowEmbed(!showEmbed)}
+            style={{
+              flex: 1,
+              padding: '10px',
+              background: '#1a3a5c',
+              border: 'none',
+              borderRadius: '6px',
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '13px',
+            }}
+          >
+            {showEmbed ? 'Hide iframe' : 'iframe code'}
+          </button>
+          <button
+            onClick={handleShareLink}
+            disabled={sharing}
+            style={{
+              flex: 1,
+              padding: '10px',
+              background: shareMsg === 'Link copied!' ? '#1a5c2a' : shareMsg ? '#5c1a1a' : '#1a3a5c',
+              border: 'none',
+              borderRadius: '6px',
+              color: 'white',
+              cursor: sharing ? 'default' : 'pointer',
+              fontSize: '13px',
+              opacity: sharing ? 0.7 : 1,
+            }}
+          >
+            {shareMsg ?? (sharing ? 'Sharing…' : 'Share link')}
+          </button>
+        </div>
 
         {showEmbed && (
           <div style={{ marginTop: '12px' }}>
